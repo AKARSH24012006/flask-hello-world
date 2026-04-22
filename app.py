@@ -3,51 +3,100 @@ import re
 
 app = Flask(__name__)
 
-MONTHS = "(January|February|March|April|May|June|July|August|September|October|November|December)"
+MONTHS = [
+    "", "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+]
 
-# ---------- DATE ----------
+# ---------- LEVEL 3: ODD / EVEN ----------
+def check_odd_even(query):
+    q = query.lower()
+
+    # extract number
+    match = re.search(r'\b\d+\b', q)
+    if not match:
+        return None
+
+    num = int(match.group(0))
+
+    # detect type
+    if "odd" in q:
+        return "YES" if num % 2 != 0 else "NO"
+
+    if "even" in q:
+        return "YES" if num % 2 == 0 else "NO"
+
+    return None
+
+
+# ---------- LEVEL 2: DATE ----------
+def month_name(m):
+    return MONTHS[m]
+
 def extract_date(text):
-    match = re.search(rf'\b\d{{1,2}}\s+{MONTHS}\s+\d{{4}}\b', text, re.IGNORECASE)
+
+    # 1️⃣ 12 March 2024
+    match = re.search(r'\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b', text, re.IGNORECASE)
     if match:
         return match.group(0)
-    return None
 
-# ---------- ODD / EVEN ----------
-def check_odd_even(query):
-    match = re.search(r'\b(\d+)\b', query)
+    # 2️⃣ March 12, 2024 → convert
+    match = re.search(r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*\d{4}', text, re.IGNORECASE)
     if match:
-        num = int(match.group(1))
-        if "odd" in query.lower():
-            return "YES" if num % 2 == 1 else "NO"
-        if "even" in query.lower():
-            return "YES" if num % 2 == 0 else "NO"
+        parts = re.findall(r'\d+|[A-Za-z]+', match.group(0))
+        return f"{int(parts[1])} {parts[0]} {parts[2]}"
+
+    # 3️⃣ 12/03/2024 → convert
+    match = re.search(r'\b\d{1,2}/\d{1,2}/\d{4}\b', text)
+    if match:
+        d, m, y = match.group(0).split('/')
+        return f"{int(d)} {month_name(int(m))} {y}"
+
+    # 4️⃣ 2024-03-12 → convert
+    match = re.search(r'\b\d{4}-\d{2}-\d{2}\b', text)
+    if match:
+        y, m, d = match.group(0).split('-')
+        return f"{int(d)} {month_name(int(m))} {y}"
+
     return None
 
-# ---------- LEVEL 1 ----------
+
+# ---------- LEVEL 1: MATH ----------
 def solve_math(query):
-    match = re.search(r'what is (\d+)\s*\+\s*(\d+)', query.lower())
+    q = query.lower()
+
+    # addition
+    match = re.search(r'what is (\d+)\s*\+\s*(\d+)', q)
     if match:
         a, b = int(match.group(1)), int(match.group(2))
         return f"The sum is {a + b}."
+
+    # subtraction
+    match = re.search(r'what is (\d+)\s*-\s*(\d+)', q)
+    if match:
+        a, b = int(match.group(1)), int(match.group(2))
+        return f"The difference is {a - b}."
+
     return None
 
-# ---------- MAIN ----------
+
+# ---------- MAIN SOLVER ----------
 def solve_query(query):
 
-    # 🔥 LEVEL 3 (highest priority)
-    odd_even = check_odd_even(query)
-    if odd_even:
-        return odd_even
+    # 🔥 PRIORITY 1 → LEVEL 3
+    result = check_odd_even(query)
+    if result:
+        return result
 
-    # 🔥 LEVEL 2
-    date = extract_date(query)
-    if date:
-        return date.strip()
+    # 🔥 PRIORITY 2 → LEVEL 2
+    result = extract_date(query)
+    if result:
+        return result.strip()
 
-    # 🔥 LEVEL 1
-    math = solve_math(query)
-    if math:
-        return math
+    # 🔥 PRIORITY 3 → LEVEL 1
+    result = solve_math(query)
+    if result:
+        return result
 
     return "Unknown"
 
@@ -61,6 +110,7 @@ def answer():
     return {"output": solve_query(query)}
 
 
+# ---------- HEALTH ----------
 @app.route("/health", methods=["GET"])
 def health():
     return {"status": "ok"}
