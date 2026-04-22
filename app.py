@@ -6,19 +6,10 @@ app = Flask(__name__)
 CORS(app)
 
 # =========================
-# HELPERS
+# CONDITION CHECK
 # =========================
-
-def extract_number(query):
-    nums = re.findall(r'-?\d+', query)
-    return int(nums[0]) if nums else 0
-
-# =========================
-# CONDITION PARSER
-# =========================
-
 def check_condition(cond, n):
-    c = cond.lower()
+    c = cond.lower().strip()
 
     # normalize
     c = c.replace("final result", "result")
@@ -29,7 +20,7 @@ def check_condition(cond, n):
     if "odd" in c: return n % 2 != 0
 
     # divisible
-    m = re.search(r'(not\s+)?divisible by (\d+)', c)
+    m = re.search(r'(not\s+)?divisible\s+by\s+(\d+)', c)
     if m:
         d = int(m.group(2))
         return (n % d != 0) if m.group(1) else (n % d == 0)
@@ -50,101 +41,106 @@ def check_condition(cond, n):
 
     return False
 
-# =========================
-# ACTION ENGINE
-# =========================
 
+# =========================
+# ACTION APPLY
+# =========================
 def apply_action(action, n):
-    a = action.lower()
+    a = action.strip()
+    al = a.lower()
 
     # OUTPUT
-    if "output" in a or "return" in a:
+    if "output" in al or "return" in al or "print" in al:
         # quoted
-        m = re.search(r'"([^"]+)"', action)
+        m = re.search(r'"([^"]+)"', a)
         if m:
-            return n, m.group(1)
+            return n, m.group(1).strip()
 
-        # uppercase words
-        m = re.search(r'\b[A-Z]{2,}\b', action)
+        # uppercase word (FIZZ, BUZZ, etc.)
+        m = re.search(r'\b[A-Z]{2,}\b', a)
         if m:
-            return n, m.group(0)
+            return n, m.group(0).strip()
 
         return n, str(n)
 
     # operations
-    if "double" in a: return n * 2, None
-    if "triple" in a: return n * 3, None
+    if "double" in al: return n * 2, None
+    if "triple" in al: return n * 3, None
 
-    m = re.search(r'add (\d+)', a)
-    if m: return n + int(m.group(1)), None
+    if "add" in al or "increase" in al:
+        num = int(re.findall(r'-?\d+', al)[0])
+        return n + num, None
 
-    m = re.search(r'increase by (\d+)', a)
-    if m: return n + int(m.group(1)), None
+    if "subtract" in al or "decrease" in al:
+        num = int(re.findall(r'-?\d+', al)[0])
+        return n - num, None
 
-    m = re.search(r'subtract (\d+)', a)
-    if m: return n - int(m.group(1)), None
-
-    m = re.search(r'decrease by (\d+)', a)
-    if m: return n - int(m.group(1)), None
-
-    m = re.search(r'multiply by (\d+)', a)
-    if m: return n * int(m.group(1)), None
+    if "multiply" in al:
+        num = int(re.findall(r'-?\d+', al)[0])
+        return n * num, None
 
     return n, None
 
-# =========================
-# RULE ENGINE
-# =========================
 
+# =========================
+# RULE ENGINE (LEVEL 7)
+# =========================
 def solve_rules(query):
     q = query.replace("->", "→")
 
-    n = extract_number(q)
+    nums = re.findall(r'-?\d+', q)
+    if not nums:
+        return ""
+    n = int(nums[0])
 
-    rules = re.split(r'Rule \d+:', q)[1:]
+    rules = re.split(r'Rule\s+\d+\s*:', q, flags=re.I)[1:]
 
     for rule in rules:
-        parts = [p.strip() for p in rule.split('.') if p.strip()]
+        sentences = [s.strip() for s in rule.split('.') if s.strip()]
 
         applied = False
 
-        for p in parts:
-            if p.lower().startswith("if"):
-                seg = p.split("→")
-                if len(seg) >= 2:
-                    cond = seg[0].replace("If", "").strip()
-                    action = seg[1].strip()
+        for s in sentences:
+            if s.lower().startswith("if"):
+                parts = s.split("→")
+                if len(parts) >= 2:
+                    cond = parts[0].replace("If", "").strip()
+                    action = parts[1].strip()
 
                     if check_condition(cond, n):
                         n, out = apply_action(action, n)
-                        if out:
-                            return out
+                        if out is not None:
+                            return out.strip()
                         applied = True
                         break
 
+        # OTHERWISE
         if not applied:
-            for p in parts:
-                if "otherwise" in p.lower():
-                    seg = p.split("→")
-                    if len(seg) >= 2:
-                        n, out = apply_action(seg[1], n)
-                        if out:
-                            return out
+            for s in sentences:
+                if "otherwise" in s.lower() or "else" in s.lower():
+                    parts = s.split("→")
+                    if len(parts) >= 2:
+                        n, out = apply_action(parts[1], n)
+                        if out is not None:
+                            return out.strip()
 
-    return str(n)
+    return str(n).strip()
+
 
 # =========================
 # MAIN SOLVER
 # =========================
-
 def solve(query):
+    if not query:
+        return ""
+
     q = query.lower()
 
     # LEVEL 7
     if "rule" in q:
         return solve_rules(query)
 
-    # LEVEL 6
+    # LEVEL 6 (prompt injection)
     if "actual task" in q:
         nums = re.findall(r'\d+', query.split("actual task")[-1])
         if len(nums) >= 2:
@@ -178,23 +174,27 @@ def solve(query):
 
     return ""
 
+
 # =========================
 # API
 # =========================
-
 @app.route("/v1/answer", methods=["POST"])
 def answer():
     data = request.get_json(force=True, silent=True) or {}
     query = str(data.get("query", "")).strip()
-    return jsonify({"output": solve(query)})
+    result = solve(query)
+    return jsonify({"output": str(result).strip()})
+
 
 @app.route("/health")
 def health():
     return {"status": "ok"}
 
+
 @app.route("/")
 def root():
     return {"status": "ok"}
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
