@@ -3,52 +3,34 @@ import re
 
 app = Flask(__name__)
 
-# ---------- CLEANING FUNCTION ----------
-def normalize(text):
-    return re.sub(r'\s+', ' ', text.strip().lower())
+# ---------- DATE EXTRACTION ----------
+def extract_date(text):
+    # Matches formats like: 12 March 2024
+    match = re.search(r'\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b', text, re.IGNORECASE)
+    
+    if match:
+        return match.group(0)
+
+    return None
 
 
-# ---------- RULE-BASED ENGINE ----------
+# ---------- MAIN SOLVER ----------
 def solve_query(query):
-    q = normalize(query)
+    
+    # 🔹 LEVEL 2: Date extraction
+    if "extract date" in query.lower():
+        result = extract_date(query)
+        if result:
+            return result
+        return "No date found"
 
-    # 🔢 Addition
-    match = re.search(r'what is (\d+)\s*\+\s*(\d+)', q)
+    # 🔹 LEVEL 1 fallback (math)
+    match = re.search(r'what is (\d+)\s*\+\s*(\d+)', query.lower())
     if match:
         a, b = int(match.group(1)), int(match.group(2))
         return f"The sum is {a + b}."
 
-    # ➖ Subtraction
-    match = re.search(r'what is (\d+)\s*-\s*(\d+)', q)
-    if match:
-        a, b = int(match.group(1)), int(match.group(2))
-        return f"The difference is {a - b}."
-
-    # ✖️ Multiplication
-    match = re.search(r'what is (\d+)\s*\*\s*(\d+)', q)
-    if match:
-        a, b = int(match.group(1)), int(match.group(2))
-        return f"The product is {a * b}."
-
-    # ➗ Division
-    match = re.search(r'what is (\d+)\s*/\s*(\d+)', q)
-    if match:
-        a, b = int(match.group(1)), int(match.group(2))
-        if b != 0:
-            return f"The result is {a // b}."
-
-    # 🌍 Common facts (boost cosine)
-    if "capital of france" in q:
-        return "The capital of France is Paris."
-
-    if "color of the sky" in q:
-        return "The sky is blue."
-
-    if "who wrote hamlet" in q:
-        return "Hamlet was written by William Shakespeare."
-
-    # 🔁 Fallback (still structured)
-    return "The answer is unknown."
+    return "Unknown"
 
 
 # ---------- API ----------
@@ -59,7 +41,6 @@ def answer():
 
     result = solve_query(query)
 
-    # ⚠️ RETURN PLAIN DICT (NO jsonify)
     return {"output": result}
 
 
