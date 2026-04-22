@@ -4,147 +4,105 @@ import re
 app = Flask(__name__)
 
 # -------------------------
-# LEVEL 5 → HIGHEST SCORER
+# HELPERS (STRICT NORMALIZATION)
 # -------------------------
-def find_highest_scorer(query):
-    pairs = re.findall(r'([A-Z][a-z]+)\s+scored\s+(\d+)', query)
-    if not pairs:
-        return None
-
-    best_name = None
-    best_score = -1
-
-    for name, score in pairs:
-        score = int(score)
-        if score > best_score:
-            best_score = score
-            best_name = name
-
-    return best_name
-
+def clean_output(text):
+    if text is None:
+        return ""
+    # exact matching requirements
+    text = str(text).strip()
+    text = text.replace(".", "").replace(",", "")
+    text = re.sub(r"\s+", " ", text)
+    return text
 
 # -------------------------
-# LEVEL 4 → SUM EVEN / ODD
-# -------------------------
-def sum_even_numbers(query):
-    q = query.lower()
-
-    nums = re.findall(r'\d+', q)
-    if not nums:
-        return None
-
-    nums = list(map(int, nums))
-
-    if "even" in q:
-        return str(sum(n for n in nums if n % 2 == 0))
-
-    if "odd" in q:
-        return str(sum(n for n in nums if n % 2 != 0))
-
-    return None
-
-
-# -------------------------
-# LEVEL 1 → MATH
+# LEVEL 1: BASIC MATH
 # -------------------------
 def solve_math(query):
-    q = query.lower()
-
-    match = re.search(r'(\d+)\s*\+\s*(\d+)', q)
-    if match:
-        a = int(match.group(1))
-        b = int(match.group(2))
-        return f"The sum is {a + b}."
-
+    # Extract numbers
+    nums = re.findall(r'-?\d+', query)
+    if len(nums) >= 2:
+        a, b = int(nums[0]), int(nums[1])
+        return f"The sum is {a + b}"
     return None
 
-
 # -------------------------
-# LEVEL 2 → DATE EXTRACTION
+# LEVEL 2: DATE EXTRACTION
 # -------------------------
 def extract_date(query):
     match = re.search(
-        r'(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})',
-        query
+        r'(\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})',
+        query,
+        re.IGNORECASE
     )
     if match:
-        return f"{match.group(1)} {match.group(2)} {match.group(3)}"
-
+        return match.group(1)
     return None
 
+# -------------------------
+# LEVEL 3: ODD CHECK
+# -------------------------
+def check_odd(query):
+    nums = re.findall(r'\d+', query)
+    if nums:
+        n = int(nums[0])
+        return "YES" if n % 2 == 1 else "NO"
+    return None
 
 # -------------------------
-# LEVEL 3 → ODD / EVEN
+# LEVEL 4: SUM EVEN NUMBERS
 # -------------------------
-def check_odd_even(query):
-    q = query.lower().strip()
-
-    match = re.search(r'\b\d+\b', q)
-    if match:
-        num = int(match.group(0))
-    else:
-        words = {
-            "one":1,"two":2,"three":3,"four":4,"five":5,
-            "six":6,"seven":7,"eight":8,"nine":9,"ten":10
-        }
-        num = None
-        for w in words:
-            if f" {w} " in f" {q} ":
-                num = words[w]
-                break
-        if num is None:
-            return None
-
-    if "odd" in q:
-        return "YES" if num % 2 != 0 else "NO"
-
-    if "even" in q:
-        return "YES" if num % 2 == 0 else "NO"
-
-    return "YES" if num % 2 != 0 else "NO"
-
+def sum_even_numbers(query):
+    nums = list(map(int, re.findall(r'-?\d+', query)))
+    if nums:
+        return str(sum(n for n in nums if n % 2 == 0))
+    return None
 
 # -------------------------
-# MAIN API
+# LEVEL 5: HIGHEST SCORER
+# -------------------------
+def find_highest_scorer(query):
+    # Normalize text
+    q = query.replace(",", " ").replace(".", " ").replace("and", " ")
+
+    # Extract pairs
+    pairs = re.findall(r'([A-Z][a-z]+)\s+scored\s+(\d+)', q)
+
+    if not pairs:
+        return None
+
+    # Find highest
+    best_name = max(pairs, key=lambda x: int(x[1]))[0]
+    return best_name
+
+# -------------------------
+# MAIN ROUTE
 # -------------------------
 @app.route("/v1/answer", methods=["POST"])
 def answer():
-    data = request.get_json(force=True) or {}
+    data = request.get_json(force=True, silent=True) or {}
     query = data.get("query", "")
 
-    # LEVEL 5 (highest priority)
-    result = find_highest_scorer(query)
-    if result:
-        return jsonify({"output": result.strip()})
+    # Try all handlers
+    result = (
+        solve_math(query)
+        or extract_date(query)
+        or check_odd(query)
+        or sum_even_numbers(query)
+        or find_highest_scorer(query)
+    )
 
-    # LEVEL 4
-    result = sum_even_numbers(query)
-    if result:
-        return jsonify({"output": result.strip()})
+    return jsonify({"output": clean_output(result)})
 
-    # LEVEL 1
-    result = solve_math(query)
-    if result:
-        return jsonify({"output": result.strip()})
-
-    # LEVEL 2
-    result = extract_date(query)
-    if result:
-        return jsonify({"output": result.strip()})
-
-    # LEVEL 3
-    result = check_odd_even(query)
-    if result:
-        return jsonify({"output": result.strip().upper()})
-
-    # fallback
-    return jsonify({"output": "YES"})
-
-
-@app.route("/health")
+# -------------------------
+# HEALTH CHECK
+# -------------------------
+@app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
 
-
+# -------------------------
+# RUN
+# -------------------------
 if __name__ == "__main__":
-    app.run()
+    app.run(host="0.0.0.0", port=8000)
