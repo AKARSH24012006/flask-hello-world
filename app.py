@@ -23,24 +23,40 @@ def answer():
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a precise AI assistant. Give only the direct answer in one short sentence. No explanations, no extra words. For math: 'The sum is X.' or 'The product is X.' etc. Match the expected output format exactly."
+                    "content": """You are answering test questions for an AI benchmark. Your answers MUST be:
+1. One short, declarative sentence
+2. Direct and factual with no preamble
+3. Match this exact style:
+   - "What is 10+15?" → "The sum is 25."
+   - "What is the capital of France?" → "The capital of France is Paris."
+   - "What color is the sky?" → "The sky is blue."
+   - "Who wrote Hamlet?" → "Hamlet was written by William Shakespeare."
+4. Use simple, common words
+5. Start with "The" when possible
+6. No markdown, no lists, no explanations
+7. Maximum 15 words"""
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            "max_tokens": 100
+            "max_tokens": 80,
+            "temperature": 0.1
         },
         timeout=15
     )
     result = resp.json()
     try:
         output = result["choices"][0]["message"]["content"].strip()
+        # Clean up common issues
+        output = output.replace("**", "").replace("*", "")
+        if output.startswith('"') and output.endswith('"'):
+            output = output[1:-1]
     except:
         output = str(result)
     return jsonify({"output": output})
