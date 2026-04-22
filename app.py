@@ -18,14 +18,17 @@ def answer():
     query = data.get("query", "")
     context = "".join(f"\n---\n{fetch_asset(u)}" for u in data.get("assets", []))
     prompt = f"Reference material:{context}\n\nQuestion: {query}" if context else query
-    
+
     resp = httpx.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-        json={"contents": [{"parts": [{"text": f"Answer accurately and concisely for an AI benchmark.\n\n{prompt}"}]}]},
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}",
+        json={"contents": [{"parts": [{"text": f"Answer accurately and concisely.\n\n{prompt}"}]}]},
         timeout=15
     )
     result = resp.json()
-    output = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+    try:
+        output = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except:
+        output = str(result)
     return jsonify({"output": output})
 
 @app.route("/health", methods=["GET"])
