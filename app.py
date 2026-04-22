@@ -24,7 +24,16 @@ def answer():
         headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
         json={
             "model": "llama-3.1-8b-instant",
-            "messages": [{"role": "user", "content": f"Answer accurately and concisely.\n\n{prompt}"}],
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a precise AI assistant. Always answer in complete sentences. For math questions, use the format 'The sum/product/difference/quotient is X.' For other questions, give a clear, direct, complete sentence answer. Be concise."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
             "max_tokens": 512
         },
         timeout=15
