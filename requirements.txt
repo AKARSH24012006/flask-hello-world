@@ -1,4 +1,4 @@
 Flask
 Gunicorn
-anthropic
+google-generativeai
 httpx
