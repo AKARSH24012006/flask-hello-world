@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import httpx, os
 
 app = Flask(__name__)
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 def fetch_asset(url):
     try:
@@ -20,13 +20,18 @@ def answer():
     prompt = f"Reference material:{context}\n\nQuestion: {query}" if context else query
 
     resp = httpx.post(
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_API_KEY}",
-        json={"contents": [{"parts": [{"text": f"Answer accurately and concisely.\n\n{prompt}"}]}]},
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+        json={
+            "model": "llama-3.1-8b-instant",
+            "messages": [{"role": "user", "content": f"Answer accurately and concisely.\n\n{prompt}"}],
+            "max_tokens": 512
+        },
         timeout=15
     )
     result = resp.json()
     try:
-        output = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+        output = result["choices"][0]["message"]["content"].strip()
     except:
         output = str(result)
     return jsonify({"output": output})
