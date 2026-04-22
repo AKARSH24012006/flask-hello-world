@@ -4,7 +4,27 @@ import re
 app = Flask(__name__)
 
 # -------------------------
-# LEVEL 4 → SUM EVEN / ODD NUMBERS
+# LEVEL 5 → HIGHEST SCORER
+# -------------------------
+def find_highest_scorer(query):
+    pairs = re.findall(r'([A-Z][a-z]+)\s+scored\s+(\d+)', query)
+    if not pairs:
+        return None
+
+    best_name = None
+    best_score = -1
+
+    for name, score in pairs:
+        score = int(score)
+        if score > best_score:
+            best_score = score
+            best_name = name
+
+    return best_name
+
+
+# -------------------------
+# LEVEL 4 → SUM EVEN / ODD
 # -------------------------
 def sum_even_numbers(query):
     q = query.lower()
@@ -92,7 +112,12 @@ def answer():
     data = request.get_json(force=True) or {}
     query = data.get("query", "")
 
-    # LEVEL 4 FIRST (highest priority)
+    # LEVEL 5 (highest priority)
+    result = find_highest_scorer(query)
+    if result:
+        return jsonify({"output": result.strip()})
+
+    # LEVEL 4
     result = sum_even_numbers(query)
     if result:
         return jsonify({"output": result.strip()})
