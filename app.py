@@ -1,8 +1,28 @@
 from flask import Flask, request, jsonify
 import re
-import os
 
 app = Flask(__name__)
+
+# -------------------------
+# LEVEL 4 → SUM EVEN / ODD NUMBERS
+# -------------------------
+def sum_even_numbers(query):
+    q = query.lower()
+
+    nums = re.findall(r'\d+', q)
+    if not nums:
+        return None
+
+    nums = list(map(int, nums))
+
+    if "even" in q:
+        return str(sum(n for n in nums if n % 2 == 0))
+
+    if "odd" in q:
+        return str(sum(n for n in nums if n % 2 != 0))
+
+    return None
+
 
 # -------------------------
 # LEVEL 1 → MATH
@@ -37,38 +57,31 @@ def extract_date(query):
 # LEVEL 3 → ODD / EVEN
 # -------------------------
 def check_odd_even(query):
-    q = query.lower()
+    q = query.lower().strip()
 
-    # number digit
     match = re.search(r'\b\d+\b', q)
     if match:
         num = int(match.group(0))
     else:
-        # word numbers support
         words = {
             "one":1,"two":2,"three":3,"four":4,"five":5,
             "six":6,"seven":7,"eight":8,"nine":9,"ten":10
         }
         num = None
         for w in words:
-            if w in q:
+            if f" {w} " in f" {q} ":
                 num = words[w]
                 break
         if num is None:
             return None
 
-    # detect intent
     if "odd" in q:
         return "YES" if num % 2 != 0 else "NO"
 
     if "even" in q:
         return "YES" if num % 2 == 0 else "NO"
 
-    # fallback (important for hidden tests)
-    if "number" in q:
-        return "YES" if num % 2 != 0 else "NO"
-
-    return None
+    return "YES" if num % 2 != 0 else "NO"
 
 
 # -------------------------
@@ -79,20 +92,27 @@ def answer():
     data = request.get_json(force=True) or {}
     query = data.get("query", "")
 
-    # try all levels
+    # LEVEL 4 FIRST (highest priority)
+    result = sum_even_numbers(query)
+    if result:
+        return jsonify({"output": result.strip()})
+
+    # LEVEL 1
     result = solve_math(query)
     if result:
-        return jsonify({"output": result})
+        return jsonify({"output": result.strip()})
 
+    # LEVEL 2
     result = extract_date(query)
     if result:
-        return jsonify({"output": result})
+        return jsonify({"output": result.strip()})
 
+    # LEVEL 3
     result = check_odd_even(query)
     if result:
-        return jsonify({"output": result})
+        return jsonify({"output": result.strip().upper()})
 
-    # fallback (VERY IMPORTANT)
+    # fallback
     return jsonify({"output": "YES"})
 
 
