@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
-import anthropic, httpx, os
+import google.generativeai as genai
+import httpx, os
 
 app = Flask(__name__)
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 def fetch_asset(url):
     try:
@@ -17,12 +19,13 @@ def answer():
     data = request.get_json(force=True, silent=True) or {}
     query = data.get("query", "")
     context = "".join(f"\n---\n{fetch_asset(u)}" for u in data.get("assets", []))
-    msg = client.messages.create(
-        model="claude-opus-4-5", max_tokens=512,
-        system="Answer accurately and concisely for an AI benchmark.",
-        messages=[{"role": "user", "content": f"{context}\n\n{query}" if context else query}]
-    )
-    return jsonify({"output": msg.content[0].text.strip()})
+    prompt = f"Reference material:{context}\n\nQuestion: {query}" if context else query
+    response = model.generate_content(f"Answer accurately and concisely for an AI benchmark.\n\n{prompt}")
+    return jsonify({"output": response.text.strip()})
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
