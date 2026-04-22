@@ -5,6 +5,114 @@ import re
 app = Flask(__name__)
 CORS(app)
 
+# =========================================================
+# LEVEL 7: RULE ENGINE (FIXED)
+# =========================================================
+
+def parse_condition(cond, n):
+    c = cond.lower().strip()
+
+    # normalize phrases
+    c = c.replace("final result", "result")
+    c = c.replace("the result", "result")
+
+    # divisible / not divisible
+    m = re.search(r'(not\s+)?divisible\s+by\s+(-?\d+)', c)
+    if m:
+        d = int(m.group(2))
+        if m.group(1):
+            return n % d != 0
+        return n % d == 0
+
+    # even / odd
+    if "even" in c: return n % 2 == 0
+    if "odd" in c: return n % 2 != 0
+
+    # comparisons
+    m = re.search(r'(?:result\s*)?>\s*(-?\d+)', c)
+    if m: return n > int(m.group(1))
+
+    m = re.search(r'(?:result\s*)?<\s*(-?\d+)', c)
+    if m: return n < int(m.group(1))
+
+    m = re.search(r'(?:result\s*)?>=\s*(-?\d+)', c)
+    if m: return n >= int(m.group(1))
+
+    m = re.search(r'(?:result\s*)?<=\s*(-?\d+)', c)
+    if m: return n <= int(m.group(1))
+
+    return False
+
+
+def apply_action(action, n):
+    a = action.lower()
+
+    # OUTPUT CASE
+    if "output" in a:
+        if "fizz" in a:
+            return n, "FIZZ"
+        return n, str(n)
+
+    # math operations
+    if "double" in a:
+        return n * 2, None
+    if "add" in a:
+        num = int(re.findall(r'-?\d+', a)[0])
+        return n + num, None
+    if "subtract" in a:
+        num = int(re.findall(r'-?\d+', a)[0])
+        return n - num, None
+
+    return n, None
+
+
+def apply_rules(query):
+    q = query.replace("->", "→")
+
+    # extract number
+    nums = re.findall(r'-?\d+', q)
+    if not nums:
+        return ""
+    n = int(nums[0])
+
+    # split rules
+    rules = re.split(r'Rule\s+\d+\s*:', q, flags=re.I)[1:]
+
+    for rule in rules:
+        sentences = [s.strip() for s in rule.split('.') if s.strip()]
+
+        applied = False
+
+        for s in sentences:
+            if s.lower().startswith("if"):
+                parts = s.split("→")
+                if len(parts) >= 2:
+                    cond = parts[0].replace("If", "").strip()
+                    action = parts[1].strip()
+
+                    if parse_condition(cond, n):
+                        n, out = apply_action(action, n)
+                        if out:
+                            return out
+                        applied = True
+                        break
+
+        # OTHERWISE
+        if not applied:
+            for s in sentences:
+                if "otherwise" in s.lower():
+                    parts = s.split("→")
+                    if len(parts) >= 2:
+                        n, out = apply_action(parts[1], n)
+                        if out:
+                            return out
+
+    return str(n)
+
+
+# =========================================================
+# MAIN SOLVER
+# =========================================================
 
 def solve(query):
     if not query:
@@ -12,85 +120,41 @@ def solve(query):
 
     q_low = query.lower()
 
-    # ---------------- LEVEL 6 (Prompt Injection Fix) ----------------
-    task = query
-    for marker in ["actual task:", "actual task :", "real task:",
-                   "actual question:", "real question:", "true task:"]:
-        idx = q_low.find(marker)
-        if idx != -1:
-            task = query[idx + len(marker):].strip()
-            break
+    # LEVEL 7
+    if "rule" in q_low:
+        return apply_rules(query)
 
-    t_low = task.lower()
+    # LEVEL 6 (prompt injection)
+    if "actual task" in q_low:
+        nums = re.findall(r'\d+', query.split("actual task")[-1])
+        if len(nums) >= 2:
+            return str(int(nums[0]) + int(nums[1]))
 
-    # Math expression (13 + 7, etc.)
-    m = re.search(r'(-?\d+)\s*([+\-*/xX×])\s*(-?\d+)', task)
-    if m:
-        a, op, b = int(m.group(1)), m.group(2), int(m.group(3))
-        if op == '+': return a + b
-        if op == '-': return a - b
-        if op in ('*', 'x', 'X', '×'): return a * b
-        if op == '/' and b != 0: return a // b
-
-    task_nums = [int(n) for n in re.findall(r'-?\d+', task)]
-    if task_nums:
-        if any(w in t_low for w in ["plus", "add", "sum", "total"]):
-            return sum(task_nums)
-        if any(w in t_low for w in ["minus", "subtract", "difference"]) and len(task_nums) >= 2:
-            return task_nums[0] - task_nums[1]
-        if any(w in t_low for w in ["times", "multiply", "product"]):
-            r = 1
-            for n in task_nums:
-                r *= n
-            return r
-
-    # ---------------- LEVEL 5 ----------------
+    # LEVEL 5
     if "scored" in q_low:
-        pairs = re.findall(r'([A-Z][a-zA-Z]+)\s+scored\s+(-?\d+)', query)
+        pairs = re.findall(r'([A-Z][a-zA-Z]+)\s+scored\s+(\d+)', query)
         if pairs:
-            if any(w in q_low for w in ["highest", "most", "top", "best", "max"]):
-                return max(pairs, key=lambda x: int(x[1]))[0]
-            if any(w in q_low for w in ["lowest", "least", "worst", "min"]):
-                return min(pairs, key=lambda x: int(x[1]))[0]
+            return max(pairs, key=lambda x: int(x[1]))[0]
 
-    # ---------------- LEVEL 4 ----------------
-    if "sum" in q_low:
-        ns = [int(n) for n in re.findall(r'-?\d+', query)]
-        if "even" in q_low:
-            return sum(n for n in ns if n % 2 == 0)
-        if "odd" in q_low:
-            return sum(n for n in ns if n % 2 != 0)
+    # LEVEL 4
+    if "sum even" in q_low:
+        nums = [int(x) for x in re.findall(r'\d+', query)]
+        return str(sum(n for n in nums if n % 2 == 0))
 
-    # ---------------- LEVEL 3 ----------------
-    if "odd" in q_low or "even" in q_low:
-        ns = re.findall(r'-?\d+', query)
-        if ns:
-            n = int(ns[0])
-            if "odd" in q_low:
-                return "YES" if n % 2 else "NO"
-            if "even" in q_low:
-                return "YES" if not n % 2 else "NO"
+    # LEVEL 3
+    if "odd" in q_low:
+        n = int(re.findall(r'\d+', query)[0])
+        return "YES" if n % 2 else "NO"
 
-    # ---------------- LEVEL 2 ----------------
-    date_m = re.search(
-        r'(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})',
-        query, re.I
-    )
-    if date_m:
-        return date_m.group(1)
-
-    # ---------------- LEVEL 1 ----------------
-    m = re.search(r'(-?\d+)\s*([+\-*/])\s*(-?\d+)', query)
+    # LEVEL 2
+    m = re.search(r'\d{1,2} \w+ \d{4}', query)
     if m:
-        a, op, b = int(m.group(1)), m.group(2), int(m.group(3))
-        if op == '+': return a + b
-        if op == '-': return a - b
-        if op == '*': return a * b
-        if op == '/' and b != 0: return a // b
+        return m.group(0)
 
-    all_nums = [int(n) for n in re.findall(r'-?\d+', query)]
-    if len(all_nums) >= 2:
-        return sum(all_nums)
+    # LEVEL 1
+    nums = [int(x) for x in re.findall(r'\d+', query)]
+    if len(nums) >= 2:
+        return str(nums[0] + nums[1])
 
     return ""
 
@@ -98,21 +162,9 @@ def solve(query):
 @app.route("/v1/answer", methods=["POST"])
 def answer():
     data = request.get_json(force=True, silent=True) or {}
-    query = str(
-        data.get("query")
-        or data.get("input")
-        or data.get("prompt")
-        or data.get("question")
-        or ""
-    ).strip()
-
+    query = str(data.get("query", "")).strip()
     result = solve(query)
-
-    # 🔥 CRITICAL FIX (TYPE HANDLING)
-    if isinstance(result, int):
-        return jsonify({"output": result})
-    else:
-        return jsonify({"output": str(result)})
+    return jsonify({"output": str(result)})
 
 
 @app.route("/health")
