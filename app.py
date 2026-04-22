@@ -4,15 +4,12 @@ import re
 app = Flask(__name__)
 
 # -------------------------
-# CLEAN OUTPUT (STRICT)
+# STRICT OUTPUT (NO EXTRA CHARACTERS)
 # -------------------------
 def clean_output(text):
     if text is None:
         return ""
-    text = str(text).strip()
-    text = text.replace(".", "").replace(",", "")
-    text = re.sub(r"\s+", " ", text)
-    return text
+    return str(text).strip()
 
 # -------------------------
 # LEVEL 1: SUM
@@ -21,7 +18,7 @@ def solve_math(query):
     nums = re.findall(r'-?\d+', query)
     if len(nums) >= 2:
         return f"The sum is {int(nums[0]) + int(nums[1])}"
-    return None
+    return ""
 
 # -------------------------
 # LEVEL 2: DATE
@@ -32,7 +29,7 @@ def extract_date(query):
         query,
         re.IGNORECASE
     )
-    return match.group(1) if match else None
+    return match.group(1) if match else ""
 
 # -------------------------
 # LEVEL 3: ODD
@@ -41,32 +38,33 @@ def check_odd(query):
     nums = re.findall(r'\d+', query)
     if nums:
         return "YES" if int(nums[0]) % 2 else "NO"
-    return None
+    return ""
 
 # -------------------------
 # LEVEL 4: SUM EVEN
 # -------------------------
 def sum_even_numbers(query):
     nums = list(map(int, re.findall(r'-?\d+', query)))
-    if nums:
-        return str(sum(n for n in nums if n % 2 == 0))
-    return None
+    return str(sum(n for n in nums if n % 2 == 0)) if nums else ""
 
 # -------------------------
-# LEVEL 5: HIGHEST SCORER
+# LEVEL 5: HIGHEST SCORER (FIXED)
 # -------------------------
 def find_highest_scorer(query):
-    q = query.replace(",", " ").replace(".", " ").replace("and", " ")
-    pairs = re.findall(r'([A-Z][a-z]+)\s+scored\s+(\d+)', q)
+    # Extract pairs ONLY
+    pairs = re.findall(r'([A-Z][a-z]+)\s+scored\s+(\d+)', query)
 
     if not pairs:
-        return None
+        return ""
 
+    # Pick highest score
     best = max(pairs, key=lambda x: int(x[1]))[0]
+
+    # IMPORTANT: return EXACT name only
     return best
 
 # -------------------------
-# MAIN ROUTE (FIXED PRIORITY)
+# MAIN ROUTE (PERFECT ROUTING)
 # -------------------------
 @app.route("/v1/answer", methods=["POST"])
 def answer():
@@ -74,7 +72,7 @@ def answer():
     query = data.get("query", "").strip()
     q = query.lower()
 
-    # 🔥 CORRECT ORDER (IMPORTANT)
+    # 🔥 STRICT INTENT ROUTING
 
     if "scored" in q and "highest" in q:
         result = find_highest_scorer(query)
@@ -88,13 +86,16 @@ def answer():
     elif "date" in q:
         result = extract_date(query)
 
-    else:
+    elif "sum" in q or "+" in q:
         result = solve_math(query)
+
+    else:
+        result = ""
 
     return jsonify({"output": clean_output(result)})
 
 # -------------------------
-# HEALTH
+# HEALTH CHECK
 # -------------------------
 @app.route("/health")
 def health():
