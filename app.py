@@ -4,30 +4,27 @@ import re
 app = Flask(__name__)
 
 # -------------------------
-# HELPERS (STRICT NORMALIZATION)
+# CLEAN OUTPUT (STRICT)
 # -------------------------
 def clean_output(text):
     if text is None:
         return ""
-    # exact matching requirements
     text = str(text).strip()
     text = text.replace(".", "").replace(",", "")
     text = re.sub(r"\s+", " ", text)
     return text
 
 # -------------------------
-# LEVEL 1: BASIC MATH
+# LEVEL 1: SUM
 # -------------------------
 def solve_math(query):
-    # Extract numbers
     nums = re.findall(r'-?\d+', query)
     if len(nums) >= 2:
-        a, b = int(nums[0]), int(nums[1])
-        return f"The sum is {a + b}"
+        return f"The sum is {int(nums[0]) + int(nums[1])}"
     return None
 
 # -------------------------
-# LEVEL 2: DATE EXTRACTION
+# LEVEL 2: DATE
 # -------------------------
 def extract_date(query):
     match = re.search(
@@ -35,22 +32,19 @@ def extract_date(query):
         query,
         re.IGNORECASE
     )
-    if match:
-        return match.group(1)
-    return None
+    return match.group(1) if match else None
 
 # -------------------------
-# LEVEL 3: ODD CHECK
+# LEVEL 3: ODD
 # -------------------------
 def check_odd(query):
     nums = re.findall(r'\d+', query)
     if nums:
-        n = int(nums[0])
-        return "YES" if n % 2 == 1 else "NO"
+        return "YES" if int(nums[0]) % 2 else "NO"
     return None
 
 # -------------------------
-# LEVEL 4: SUM EVEN NUMBERS
+# LEVEL 4: SUM EVEN
 # -------------------------
 def sum_even_numbers(query):
     nums = list(map(int, re.findall(r'-?\d+', query)))
@@ -62,42 +56,47 @@ def sum_even_numbers(query):
 # LEVEL 5: HIGHEST SCORER
 # -------------------------
 def find_highest_scorer(query):
-    # Normalize text
     q = query.replace(",", " ").replace(".", " ").replace("and", " ")
-
-    # Extract pairs
     pairs = re.findall(r'([A-Z][a-z]+)\s+scored\s+(\d+)', q)
 
     if not pairs:
         return None
 
-    # Find highest
-    best_name = max(pairs, key=lambda x: int(x[1]))[0]
-    return best_name
+    best = max(pairs, key=lambda x: int(x[1]))[0]
+    return best
 
 # -------------------------
-# MAIN ROUTE
+# MAIN ROUTE (FIXED PRIORITY)
 # -------------------------
 @app.route("/v1/answer", methods=["POST"])
 def answer():
     data = request.get_json(force=True, silent=True) or {}
-    query = data.get("query", "")
+    query = data.get("query", "").strip()
+    q = query.lower()
 
-    # Try all handlers
-    result = (
-        solve_math(query)
-        or extract_date(query)
-        or check_odd(query)
-        or sum_even_numbers(query)
-        or find_highest_scorer(query)
-    )
+    # 🔥 CORRECT ORDER (IMPORTANT)
+
+    if "scored" in q and "highest" in q:
+        result = find_highest_scorer(query)
+
+    elif "sum even" in q:
+        result = sum_even_numbers(query)
+
+    elif "odd" in q:
+        result = check_odd(query)
+
+    elif "date" in q:
+        result = extract_date(query)
+
+    else:
+        result = solve_math(query)
 
     return jsonify({"output": clean_output(result)})
 
 # -------------------------
-# HEALTH CHECK
+# HEALTH
 # -------------------------
-@app.route("/health", methods=["GET"])
+@app.route("/health")
 def health():
     return jsonify({"status": "ok"})
 
