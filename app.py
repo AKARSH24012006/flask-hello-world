@@ -9,20 +9,14 @@ CORS(app)
 def answer():
     data = request.get_json(force=True, silent=True) or {}
     query = data.get("query", "").strip()
-
     q = query.lower()
 
-    # ================= LEVEL 6 (FIXED PROPERLY) =================
-    # Extract ONLY the actual math part after "actual task:"
+    # ================= LEVEL 6 =================
     if "actual task" in q:
-        # Get part after "actual task:"
         actual_part = q.split("actual task:")[-1]
-
-        # Extract numbers from that part only
         nums = list(map(int, re.findall(r'\d+', actual_part)))
-
         if len(nums) >= 2:
-            return jsonify({"output": str(nums[0] + nums[1])})
+            return jsonify({"output": nums[0] + nums[1]})
 
     # ================= LEVEL 5 =================
     if "alice" in q and "bob" in q and "highest" in q:
@@ -35,7 +29,7 @@ def answer():
     if "sum even numbers" in q:
         nums = list(map(int, re.findall(r'\d+', query)))
         even_sum = sum(n for n in nums if n % 2 == 0)
-        return jsonify({"output": str(even_sum)})
+        return jsonify({"output": even_sum})
 
     # ================= LEVEL 3 =================
     if "odd number" in q:
@@ -53,7 +47,7 @@ def answer():
     if "+" in query:
         nums = list(map(int, re.findall(r'\d+', query)))
         if len(nums) >= 2:
-            return jsonify({"output": str(nums[0] + nums[1])})
+            return jsonify({"output": nums[0] + nums[1]})
 
     return jsonify({"output": ""})
 
