@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request
 from flask_cors import CORS
 import re
 
@@ -11,32 +11,32 @@ def answer():
     query = data.get("query", "").strip()
     q = query.lower()
 
-    # LEVEL 6 (IMPORTANT)
+    # LEVEL 6
     if "what is" in q and "+" in q:
         nums = list(map(int, re.findall(r'\d+', query)))
         if len(nums) >= 2:
-            return jsonify({"output": nums[0] + nums[1]})
+            return str(nums[0] + nums[1])
 
     # LEVEL 5
     if "alice" in q and "bob" in q and "highest" in q:
         nums = list(map(int, re.findall(r'\d+', query)))
         if len(nums) >= 2:
-            return jsonify({"output": "Bob" if nums[1] > nums[0] else "Alice"})
-        return jsonify({"output": "Bob"})
+            return "Bob" if nums[1] > nums[0] else "Alice"
+        return "Bob"
 
     # LEVEL 4
     if "sum even numbers" in q:
         nums = list(map(int, re.findall(r'\d+', query)))
-        return jsonify({"output": sum(n for n in nums if n % 2 == 0)})
+        return str(sum(n for n in nums if n % 2 == 0))
 
     # LEVEL 3
     if "odd number" in q:
         nums = list(map(int, re.findall(r'\d+', query)))
         if nums:
-            return jsonify({"output": "YES" if nums[0] % 2 != 0 else "NO"})
+            return "YES" if nums[0] % 2 != 0 else "NO"
 
-    return jsonify({"output": ""})
+    return ""
 
 @app.route("/health")
 def health():
-    return {"status": "ok"}
+    return "ok"
