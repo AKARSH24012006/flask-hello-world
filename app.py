@@ -20,7 +20,7 @@ def answer():
     prompt = f"Reference material:{context}\n\nQuestion: {query}" if context else query
 
     resp = httpx.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key={GEMINI_API_KEY}",
         json={"contents": [{"parts": [{"text": f"Answer accurately and concisely.\n\n{prompt}"}]}]},
         timeout=15
     )
