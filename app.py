@@ -1,10 +1,8 @@
 from flask import Flask, request, jsonify
-import google.generativeai as genai
 import httpx, os
 
 app = Flask(__name__)
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-1.5-flash")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 def fetch_asset(url):
     try:
@@ -20,8 +18,15 @@ def answer():
     query = data.get("query", "")
     context = "".join(f"\n---\n{fetch_asset(u)}" for u in data.get("assets", []))
     prompt = f"Reference material:{context}\n\nQuestion: {query}" if context else query
-    response = model.generate_content(f"Answer accurately and concisely for an AI benchmark.\n\n{prompt}")
-    return jsonify({"output": response.text.strip()})
+    
+    resp = httpx.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
+        json={"contents": [{"parts": [{"text": f"Answer accurately and concisely for an AI benchmark.\n\n{prompt}"}]}]},
+        timeout=15
+    )
+    result = resp.json()
+    output = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+    return jsonify({"output": output})
 
 @app.route("/health", methods=["GET"])
 def health():
