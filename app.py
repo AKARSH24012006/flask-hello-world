@@ -27,14 +27,14 @@ def answer():
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a precise AI assistant. Always answer in complete sentences. For math questions, use the format 'The sum/product/difference/quotient is X.' For other questions, give a clear, direct, complete sentence answer. Be concise."
+                    "content": "You are a precise AI assistant. Give only the direct answer in one short sentence. No explanations, no extra words. For math: 'The sum is X.' or 'The product is X.' etc. Match the expected output format exactly."
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            "max_tokens": 512
+            "max_tokens": 100
         },
         timeout=15
     )
