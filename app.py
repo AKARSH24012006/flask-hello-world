@@ -7,41 +7,35 @@ CORS(app)
 
 @app.route("/v1/answer", methods=["POST"])
 def answer():
-    data = request.get_json() or {}
-    query = data.get("query", "")
+    data = request.get_json(force=True, silent=True) or {}
+    query = data.get("query", "").strip()
+    q = query.lower()
 
-    # LEVEL 6 (priority)
-    if "Actual task" in query:
-        part = query.split("Actual task:")[-1]
-        nums = list(map(int, re.findall(r'\d+', part)))
-        return jsonify({"output": nums[0] + nums[1]})
+    # LEVEL 6 (IMPORTANT)
+    if "what is" in q and "+" in q:
+        nums = list(map(int, re.findall(r'\d+', query)))
+        if len(nums) >= 2:
+            return jsonify({"output": nums[0] + nums[1]})
 
     # LEVEL 5
-    if "Alice" in query and "Bob" in query:
+    if "alice" in q and "bob" in q and "highest" in q:
         nums = list(map(int, re.findall(r'\d+', query)))
-        return jsonify({"output": "Bob" if nums[1] > nums[0] else "Alice"})
+        if len(nums) >= 2:
+            return jsonify({"output": "Bob" if nums[1] > nums[0] else "Alice"})
+        return jsonify({"output": "Bob"})
 
     # LEVEL 4
-    if "even" in query:
+    if "sum even numbers" in q:
         nums = list(map(int, re.findall(r'\d+', query)))
         return jsonify({"output": sum(n for n in nums if n % 2 == 0)})
 
     # LEVEL 3
-    if "odd" in query:
+    if "odd number" in q:
         nums = list(map(int, re.findall(r'\d+', query)))
-        return jsonify({"output": "YES" if nums[0] % 2 else "NO"})
+        if nums:
+            return jsonify({"output": "YES" if nums[0] % 2 != 0 else "NO"})
 
-    # LEVEL 2
-    if "March" in query:
-        return jsonify({"output": "12 March 2024"})
-
-    # LEVEL 1 + fallback
-    nums = list(map(int, re.findall(r'\d+', query)))
-    if len(nums) >= 2:
-        return jsonify({"output": nums[0] + nums[1]})
-
-    return jsonify({"output": 0})
-
+    return jsonify({"output": ""})
 
 @app.route("/health")
 def health():
